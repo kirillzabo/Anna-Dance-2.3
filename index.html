@@ -1,0 +1,4679 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#111827">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+  <title>Dance Planner</title>
+
+  <script>
+    tailwind = {
+      config: {
+        darkMode: 'class'
+      }
+    }
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <style>
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f3f4f6;
+    }
+
+    html.dark body {
+      background: #111827;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    input,
+    select,
+    textarea {
+      outline: none;
+    }
+
+    .safe-bottom {
+      padding-bottom: calc(90px + env(safe-area-inset-bottom));
+    }
+
+    .bottom-nav {
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      scrollbar-width: none;
+    }
+
+    .calendar-day {
+      min-height: 72px;
+    }
+
+    @media (min-width: 768px) {
+      .calendar-day {
+        min-height: 110px;
+      }
+    }
+
+    .bar {
+      transition: height .25s ease;
+    }
+
+    .fade-enter-active,
+    .fade-leave-active {
+      transition: opacity .15s ease;
+    }
+
+    .fade-enter-from,
+    .fade-leave-to {
+      opacity: 0;
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+
+  <!-- APP -->
+  <div class="min-h-screen bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+
+    <!-- HEADER -->
+    <header class="sticky top-0 z-30 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+      <div class="max-w-md md:max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+
+        <div>
+          <div class="font-bold text-lg leading-tight">
+            Dance Planner
+          </div>
+
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            {{ headerDate }}
+          </div>
+        </div>
+
+        <button
+          @click="activeTab = 'settings'"
+          class="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center active:scale-95"
+          title="Настройки"
+        >
+          <i class="fa-solid fa-gear"></i>
+        </button>
+      </div>
+    </header>
+
+
+    <!-- CONTENT -->
+    <main class="max-w-md md:max-w-2xl mx-auto px-4 pt-4 safe-bottom">
+
+      <!-- ================= TODAY ================= -->
+      <section v-if="activeTab === 'today'">
+
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h1 class="text-2xl font-bold">Сегодня</h1>
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ formatLongDate(todayISO()) }}
+            </div>
+          </div>
+
+          <button
+            @click="openAdd(todayISO())"
+            class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm active:scale-95"
+          >
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+
+        <!-- EMPTY -->
+        <div
+          v-if="todayLessons.length === 0"
+          class="bg-white dark:bg-gray-900 rounded-2xl p-8 text-center border border-gray-200 dark:border-gray-800"
+        >
+          <div class="text-4xl mb-3">📅</div>
+
+          <div class="font-semibold mb-1">
+            На сегодня занятий нет
+          </div>
+
+          <div class="text-sm text-gray-500 dark:text-gray-400 mb-5">
+            Добавь первое занятие
+          </div>
+
+          <button
+            @click="openAdd(todayISO())"
+            class="px-5 py-3 rounded-xl bg-indigo-600 text-white font-medium"
+          >
+            Добавить занятие
+          </button>
+        </div>
+
+
+        <!-- TODAY LESSONS -->
+        <div
+          v-for="lesson in sortedTodayLessons"
+          :key="lesson.id"
+          class="bg-white dark:bg-gray-900 rounded-2xl p-4 mb-3 border border-gray-200 dark:border-gray-800 shadow-sm"
+        >
+
+          <!-- TOP -->
+          <div class="flex items-start justify-between gap-3">
+
+            <div class="min-w-0 flex-1">
+
+              <div class="flex items-center gap-2 mb-1">
+                <span class="font-bold text-lg">
+                  {{ lesson.start }}–{{ lesson.end }}
+                </span>
+
+                <span
+                  class="text-xs px-2 py-1 rounded-full text-white"
+                  :style="{backgroundColor: typeColor(lesson.typeId)}"
+                >
+                  {{ typeName(lesson.typeId) }}
+                </span>
+              </div>
+
+              <div class="font-medium truncate">
+                {{ lessonTitle(lesson) }}
+              </div>
+
+              <div
+                v-if="lesson.schoolId"
+                class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+              >
+                <i class="fa-solid fa-location-dot mr-1"></i>
+                {{ schoolName(lesson.schoolId) }}
+              </div>
+
+              <div
+                v-if="lesson.peopleCount !== null && lesson.peopleCount !== undefined"
+                class="text-sm text-gray-500 dark:text-gray-400"
+              >
+                <i class="fa-solid fa-users mr-1"></i>
+                {{ lesson.peopleCount }}
+                {{ pluralPeople(lesson.peopleCount) }}
+              </div>
+
+              <div
+                v-if="lesson.note"
+                class="text-sm text-gray-500 dark:text-gray-400 mt-1"
+              >
+                {{ lesson.note }}
+              </div>
+
+            </div>
+
+            <div class="text-right shrink-0">
+              <div
+                class="font-bold"
+                :class="lesson.status === 'cancelled'
+                  ? 'text-gray-400 line-through'
+                  : 'text-green-600 dark:text-green-400'"
+              >
+                {{ money(lesson.price) }}
+              </div>
+
+              <div class="text-xs text-gray-400">
+                {{ statusName(lesson.status) }}
+              </div>
+            </div>
+          </div>
+
+
+          <!-- ACTIONS -->
+          <div class="flex items-center gap-1 mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+
+            <button
+              @click="editLesson(lesson)"
+              class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 active:scale-95"
+              title="Изменить"
+              aria-label="Изменить"
+            >
+              <i class="fa-solid fa-pen text-xs"></i>
+            </button>
+
+            <button
+              @click="copyLesson(lesson)"
+              class="w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-600 dark:text-gray-300 active:scale-95"
+              title="Копировать"
+              aria-label="Копировать"
+            >
+              <i class="fa-regular fa-copy text-xs"></i>
+            </button>
+
+            <button
+              v-if="lesson.status !== 'conducted'"
+              @click="setStatus(lesson, 'conducted')"
+              class="w-8 h-8 rounded-lg bg-green-50 dark:bg-green-950/40 text-green-600 flex items-center justify-center active:scale-95"
+              title="Проведено"
+              aria-label="Проведено"
+            >
+              <i class="fa-solid fa-check text-xs"></i>
+            </button>
+
+            <button
+              v-if="lesson.status !== 'cancelled'"
+              @click="setStatus(lesson, 'cancelled')"
+              class="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-950/40 text-orange-600 flex items-center justify-center active:scale-95"
+              title="Отменить"
+              aria-label="Отменить"
+            >
+              <i class="fa-solid fa-xmark text-xs"></i>
+            </button>
+
+            <button
+              v-if="lesson.status !== 'planned'"
+              @click="setStatus(lesson, 'planned')"
+              class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-blue-600 flex items-center justify-center active:scale-95"
+              title="Вернуть в план"
+              aria-label="Вернуть в план"
+            >
+              <i class="fa-solid fa-rotate-left text-xs"></i>
+            </button>
+
+            <button
+              @click="deleteLesson(lesson)"
+              class="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 flex items-center justify-center active:scale-95 ml-auto"
+              title="Удалить"
+              aria-label="Удалить"
+            >
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+
+          </div>
+        </div>
+
+
+        <!-- TODAY STATS -->
+        <div
+          v-if="todayLessons.length"
+          class="grid grid-cols-2 gap-3 mt-4"
+        >
+
+          <stat-card
+            label="Занятий"
+            :value="todayStats.lessons"
+            icon="fa-calendar-check"
+          />
+
+          <stat-card
+            label="Часов"
+            :value="todayStats.hours"
+            icon="fa-clock"
+          />
+
+          <stat-card
+            label="Людей"
+            :value="todayStats.people"
+            icon="fa-users"
+          />
+
+          <stat-card
+            label="Заработано"
+            :value="money(todayStats.earned)"
+            icon="fa-money-bill-wave"
+          />
+
+        </div>
+
+      </section>
+
+
+      <!-- ================= CALENDAR ================= -->
+      <section v-if="activeTab === 'calendar'">
+
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h1 class="text-2xl font-bold">Календарь</h1>
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ calendarTitle }}
+            </div>
+          </div>
+
+          <button
+            @click="openAdd(selectedDate)"
+            class="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center"
+          >
+            <i class="fa-solid fa-plus"></i>
+          </button>
+        </div>
+
+
+        <!-- VIEW SWITCH -->
+        <div class="grid grid-cols-3 gap-1 bg-gray-200 dark:bg-gray-800 rounded-xl p-1 mb-4">
+
+          <button
+            v-for="mode in calendarModes"
+            :key="mode.id"
+            @click="calendarMode = mode.id"
+            class="py-2 rounded-lg text-sm font-medium transition"
+            :class="calendarMode === mode.id
+              ? 'bg-white dark:bg-gray-700 shadow'
+              : 'text-gray-500 dark:text-gray-400'"
+          >
+            {{ mode.name }}
+          </button>
+
+        </div>
+
+
+        <!-- NAVIGATION -->
+        <div class="flex items-center justify-between mb-3">
+
+          <button
+            @click="calendarPrev"
+            class="w-9 h-9 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+          >
+            <i class="fa-solid fa-chevron-left text-xs"></i>
+          </button>
+
+          <button
+            @click="selectedDate = todayISO()"
+            class="px-3 py-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-sm"
+          >
+            Сегодня
+          </button>
+
+          <button
+            @click="calendarNext"
+            class="w-9 h-9 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+          >
+            <i class="fa-solid fa-chevron-right text-xs"></i>
+          </button>
+
+        </div>
+
+
+        <!-- MONTH -->
+        <div
+          v-if="calendarMode === 'month'"
+          class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden"
+        >
+
+          <div class="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800">
+
+            <div
+              v-for="day in weekNames"
+              :key="day"
+              class="py-2 text-center text-xs font-semibold text-gray-400"
+            >
+              {{ day }}
+            </div>
+
+          </div>
+
+          <div class="grid grid-cols-7">
+
+            <div
+              v-for="(cell, index) in monthCells"
+              :key="index"
+              @click="cell.date && (selectedDate = cell.date, activeTab = 'today')"
+              class="calendar-day border-r border-b border-gray-100 dark:border-gray-800 p-1.5 cursor-pointer"
+              :class="[
+                cell.date ? 'bg-white dark:bg-gray-900' : 'bg-gray-50 dark:bg-gray-950',
+                cell.date === todayISO() ? 'ring-2 ring-inset ring-indigo-500' : ''
+              ]"
+            >
+
+              <template v-if="cell.date">
+
+                <div
+                  class="w-7 h-7 rounded-full flex items-center justify-center text-sm mb-1"
+                  :class="cell.date === selectedDate
+                    ? 'bg-indigo-600 text-white font-bold'
+                    : ''"
+                >
+                  {{ cell.day }}
+                </div>
+
+                <div
+                  v-for="lesson in cell.lessons.slice(0, 3)"
+                  :key="lesson.id"
+                  class="h-1.5 rounded-full mb-1"
+                  :style="{backgroundColor: typeColor(lesson.typeId)}"
+                ></div>
+
+                <div
+                  v-if="cell.lessons.length > 3"
+                  class="text-[9px] text-gray-400"
+                >
+                  +{{ cell.lessons.length - 3 }}
+                </div>
+
+              </template>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- WEEK -->
+        <div v-if="calendarMode === 'week'" class="space-y-3">
+
+          <div
+            v-for="day in weekDays"
+            :key="day.date"
+            @click="selectedDate = day.date"
+            class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden cursor-pointer"
+          >
+
+            <div class="px-4 py-3 flex items-center justify-between border-b border-gray-100 dark:border-gray-800">
+
+              <div>
+                <div class="font-semibold">
+                  {{ formatWeekDay(day.date) }}
+                </div>
+
+                <div class="text-xs text-gray-400">
+                  {{ formatShortDate(day.date) }}
+                </div>
+              </div>
+
+              <div
+                v-if="day.lessons.length"
+                class="w-2.5 h-2.5 rounded-full bg-indigo-500"
+              ></div>
+
+            </div>
+
+            <div v-if="day.lessons.length" class="p-3 space-y-2">
+
+              <div
+                v-for="lesson in day.lessons"
+                :key="lesson.id"
+                class="rounded-xl p-3 border-l-4 bg-gray-50 dark:bg-gray-800/70"
+                :style="{borderLeftColor: typeColor(lesson.typeId)}"
+                @click.stop
+              >
+
+                <div class="flex justify-between gap-3">
+
+                  <div class="min-w-0">
+                    <div class="font-semibold text-sm">
+                      {{ lesson.start }}–{{ lesson.end }}
+                    </div>
+
+                    <div class="text-sm truncate">
+                      {{ lessonTitle(lesson) }}
+                    </div>
+
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ typeName(lesson.typeId) }}
+                      <span v-if="lesson.peopleCount">
+                        · {{ lesson.peopleCount }} чел.
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="font-bold text-sm">
+                    {{ money(lesson.price) }}
+                  </div>
+
+                </div>
+
+
+                <div class="flex gap-1 mt-2">
+
+                  <button
+                    @click="editLesson(lesson)"
+                    class="w-7 h-7 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center"
+                    title="Изменить"
+                  >
+                    <i class="fa-solid fa-pen text-[10px]"></i>
+                  </button>
+
+                  <button
+                    @click="copyLesson(lesson)"
+                    class="w-7 h-7 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center"
+                    title="Копировать"
+                  >
+                    <i class="fa-regular fa-copy text-[10px]"></i>
+                  </button>
+
+                  <button
+                    @click="setStatus(lesson, lesson.status === 'conducted' ? 'planned' : 'conducted')"
+                    class="w-7 h-7 rounded-lg bg-white dark:bg-gray-700 flex items-center justify-center"
+                    :title="lesson.status === 'conducted' ? 'Вернуть в план' : 'Проведено'"
+                  >
+                    <i
+                      class="fa-solid text-[10px]"
+                      :class="lesson.status === 'conducted'
+                        ? 'fa-rotate-left'
+                        : 'fa-check'"
+                    ></i>
+                  </button>
+
+                  <button
+                    @click="deleteLesson(lesson)"
+                    class="w-7 h-7 rounded-lg bg-white dark:bg-gray-700 text-red-500 flex items-center justify-center"
+                    title="Удалить"
+                  >
+                    <i class="fa-solid fa-trash text-[10px]"></i>
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+
+            <div
+              v-else
+              class="px-4 py-4 text-sm text-gray-400"
+            >
+              Нет занятий
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- DAY -->
+        <div v-if="calendarMode === 'day'">
+
+          <div
+            v-if="selectedDayLessons.length === 0"
+            class="bg-white dark:bg-gray-900 rounded-2xl p-8 text-center border border-gray-200 dark:border-gray-800"
+          >
+            <div class="text-3xl mb-2">📅</div>
+            <div class="font-semibold">Занятий нет</div>
+          </div>
+
+          <div
+            v-for="lesson in selectedDayLessons"
+            :key="lesson.id"
+            class="bg-white dark:bg-gray-900 rounded-2xl p-4 mb-3 border border-gray-200 dark:border-gray-800"
+          >
+
+            <div class="flex justify-between">
+
+              <div>
+                <div class="font-bold">
+                  {{ lesson.start }}–{{ lesson.end }}
+                </div>
+
+                <div>
+                  {{ lessonTitle(lesson) }}
+                </div>
+
+                <div class="text-sm text-gray-500">
+                  {{ typeName(lesson.typeId) }}
+                </div>
+              </div>
+
+              <div class="font-bold">
+                {{ money(lesson.price) }}
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+        <!-- COPY WEEK -->
+        <button
+          v-if="calendarMode === 'week'"
+          @click="copyWeek"
+          class="w-full mt-4 py-3 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 font-medium"
+        >
+          <i class="fa-regular fa-copy mr-2"></i>
+          Скопировать неделю
+        </button>
+
+      </section>
+
+
+      <!-- ================= ADD / EDIT ================= -->
+      <section v-if="activeTab === 'add'">
+
+        <div class="flex items-center justify-between mb-4">
+
+          <div>
+            <h1 class="text-2xl font-bold">
+              {{ formMode === 'edit'
+                ? 'Изменить занятие'
+                : formMode === 'copy'
+                  ? 'Копия занятия'
+                  : 'Новое занятие' }}
+            </h1>
+
+            <div class="text-sm text-gray-500 dark:text-gray-400">
+              {{ formatLongDate(newLesson.date) }}
+            </div>
+          </div>
+
+          <button
+            @click="cancelForm"
+            class="w-9 h-9 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800"
+          >
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+
+        </div>
+
+
+        <div class="space-y-4">
+
+          <!-- DATE -->
+          <form-field label="Дата">
+            <input
+              v-model="newLesson.date"
+              type="date"
+              class="field"
+            >
+          </form-field>
+
+
+          <!-- TIME -->
+          <div class="grid grid-cols-2 gap-3">
+
+            <form-field label="Начало">
+              <input
+                v-model="newLesson.start"
+                type="time"
+                class="field"
+              >
+            </form-field>
+
+            <form-field label="Конец">
+              <input
+                v-model="newLesson.end"
+                type="time"
+                class="field"
+              >
+            </form-field>
+
+          </div>
+
+
+          <!-- TYPE -->
+          <form-field label="Тип занятия">
+
+            <select
+              v-model="newLesson.typeId"
+              class="field"
+              @change="onLessonTypeChanged"
+            >
+              <option
+                v-for="type in lessonTypes"
+                :key="type.id"
+                :value="type.id"
+              >
+                {{ type.icon }} {{ type.name }}
+              </option>
+            </select>
+
+          </form-field>
+
+
+          <!-- OTHER -->
+          <form-field
+            v-if="newLesson.typeId === 'other'"
+            label="Что именно?"
+          >
+            <input
+              v-model="newLesson.otherText"
+              type="text"
+              class="field"
+              placeholder="Например: постановка номера"
+            >
+          </form-field>
+
+
+          <!-- SCHOOL -->
+          <form-field label="Школа / место">
+
+            <select
+              v-model="newLesson.schoolId"
+              class="field"
+              @change="recalculatePrice"
+            >
+              <option value="">Без школы</option>
+
+              <option
+                v-for="school in selectableSchools"
+                :key="school.id"
+                :value="school.id"
+              >
+                {{ school.name }}
+              </option>
+
+            </select>
+
+          </form-field>
+
+
+          <!-- GROUP -->
+          <form-field
+            v-if="['group','sub','reh'].includes(newLesson.typeId)"
+            label="Группа"
+          >
+
+            <select
+              v-model="newLesson.groupId"
+              class="field"
+              @change="onGroupChanged"
+            >
+              <option value="">Выбрать группу</option>
+
+              <option
+                v-for="group in selectableGroups"
+                :key="group.id"
+                :value="group.id"
+              >
+                {{ group.name }}
+              </option>
+
+            </select>
+
+          </form-field>
+
+
+          <!-- STUDENT -->
+          <form-field
+            v-if="newLesson.typeId === 'indiv'"
+            label="Ученик"
+          >
+            <input
+              v-model="newLesson.studentName"
+              type="text"
+              class="field"
+              placeholder="Имя ученика"
+            >
+          </form-field>
+
+
+          <!-- PEOPLE -->
+          <div
+            v-if="['group','sub','reh'].includes(newLesson.typeId)"
+            class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
+          >
+
+            <div class="flex items-center justify-between">
+
+              <div>
+                <div class="font-medium">
+                  Количество людей
+                </div>
+
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  От этого зависит автоматическая оплата
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2">
+
+                <button
+                  @click="changePeople(-1)"
+                  class="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800"
+                >
+                  −
+                </button>
+
+                <div class="w-10 text-center font-bold text-lg">
+                  {{ newLesson.peopleCount }}
+                </div>
+
+                <button
+                  @click="changePeople(1)"
+                  class="w-9 h-9 rounded-xl bg-gray-100 dark:bg-gray-800"
+                >
+                  +
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <!-- PAYMENT -->
+          <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+
+            <div class="flex items-center justify-between mb-2">
+
+              <div>
+                <div class="font-medium">
+                  Оплата
+                </div>
+
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Можно изменить вручную
+                </div>
+              </div>
+
+              <div
+                v-if="autoCalculatedPrice !== null"
+                class="text-xs text-gray-500 dark:text-gray-400"
+              >
+                По настройкам: {{ money(autoCalculatedPrice) }}
+              </div>
+
+            </div>
+
+            <div class="relative">
+
+              <input
+                v-model.number="newLesson.price"
+                type="number"
+                min="0"
+                step="1"
+                class="field pr-14 text-lg font-bold"
+                placeholder="0"
+              >
+
+              <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">
+                {{ currency }}
+              </span>
+
+            </div>
+
+          </div>
+
+
+          <!-- STATUS -->
+          <form-field label="Статус">
+
+            <select
+              v-model="newLesson.status"
+              class="field"
+            >
+              <option value="planned">Запланировано</option>
+              <option value="conducted">Проведено</option>
+              <option value="cancelled">Отменено</option>
+            </select>
+
+          </form-field>
+
+
+          <!-- NOTE -->
+          <form-field label="Заметка">
+
+            <textarea
+              v-model="newLesson.note"
+              rows="3"
+              class="field resize-none"
+              placeholder="Дополнительная информация"
+            ></textarea>
+
+          </form-field>
+
+
+          <!-- SAVE -->
+          <button
+            @click="saveLesson"
+            class="w-full py-3.5 rounded-xl bg-indigo-600 text-white font-semibold shadow-sm active:scale-[.99]"
+          >
+            <i class="fa-solid fa-check mr-2"></i>
+            {{ formMode === 'edit' ? 'Сохранить изменения' : 'Создать занятие' }}
+          </button>
+
+        </div>
+
+      </section>
+
+
+      <!-- ================= FINANCE ================= -->
+      <section v-if="activeTab === 'finance'">
+
+        <h1 class="text-2xl font-bold mb-1">
+          Финансы
+        </h1>
+
+        <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          Только выбранный период
+        </div>
+
+
+        <!-- PERIOD -->
+        <div class="grid grid-cols-3 gap-1 bg-gray-200 dark:bg-gray-800 rounded-xl p-1 mb-4">
+
+          <button
+            @click="financePeriod = 'week'"
+            class="py-2 rounded-lg text-sm"
+            :class="financePeriod === 'week'
+              ? 'bg-white dark:bg-gray-700 shadow font-medium'
+              : 'text-gray-500'"
+          >
+            Неделя
+          </button>
+
+          <button
+            @click="financePeriod = 'month'"
+            class="py-2 rounded-lg text-sm"
+            :class="financePeriod === 'month'
+              ? 'bg-white dark:bg-gray-700 shadow font-medium'
+              : 'text-gray-500'"
+          >
+            Месяц
+          </button>
+
+          <button
+            @click="financePeriod = 'custom'"
+            class="py-2 rounded-lg text-sm"
+            :class="financePeriod === 'custom'
+              ? 'bg-white dark:bg-gray-700 shadow font-medium'
+              : 'text-gray-500'"
+          >
+            Свой
+          </button>
+
+        </div>
+
+
+        <!-- PERIOD DATE -->
+        <div
+          v-if="financePeriod !== 'custom'"
+          class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 mb-4"
+        >
+
+          <label class="text-sm text-gray-500 block mb-2">
+            Дата периода
+          </label>
+
+          <input
+            v-model="financeDate"
+            type="date"
+            class="field"
+          >
+
+          <div class="text-xs text-gray-500 mt-2">
+            {{ formatLongDate(financeStart) }}
+            —
+            {{ formatLongDate(financeEnd) }}
+          </div>
+
+        </div>
+
+
+        <!-- CUSTOM -->
+        <div
+          v-if="financePeriod === 'custom'"
+          class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 mb-4"
+        >
+
+          <div class="grid grid-cols-2 gap-3">
+
+            <form-field label="От">
+              <input
+                v-model="financeStartCustom"
+                type="date"
+                class="field"
+              >
+            </form-field>
+
+            <form-field label="До">
+              <input
+                v-model="financeEndCustom"
+                type="date"
+                class="field"
+              >
+            </form-field>
+
+          </div>
+
+        </div>
+
+
+        <!-- TOTAL -->
+        <div
+          class="bg-indigo-600 text-white rounded-2xl p-5 mb-4"
+        >
+
+          <div class="text-sm opacity-80">
+            Заработано
+          </div>
+
+          <div class="text-3xl font-bold mt-1">
+            {{ money(financeStats.earned) }}
+          </div>
+
+          <div class="text-sm opacity-80 mt-2">
+            {{ financeStats.lessons }} проведённых занятий
+          </div>
+
+        </div>
+
+
+        <div class="grid grid-cols-2 gap-3 mb-4">
+
+          <stat-card
+            label="Запланировано"
+            :value="money(financeStats.planned)"
+            icon="fa-calendar"
+          />
+
+          <stat-card
+            label="Часов"
+            :value="financeStats.hours"
+            icon="fa-clock"
+          />
+
+          <stat-card
+            label="Людей"
+            :value="financeStats.people"
+            icon="fa-users"
+          />
+
+          <stat-card
+            label="Среднее"
+            :value="money(financeStats.average)"
+            icon="fa-chart-line"
+          />
+
+        </div>
+
+
+        <!-- BAR CHART -->
+        <div
+          class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4"
+        >
+
+          <div class="font-semibold mb-4">
+            Доход по дням
+          </div>
+
+          <div
+            v-if="financeBars.length"
+            class="flex items-end gap-1 overflow-x-auto no-scrollbar"
+            style="height: 180px"
+          >
+
+            <div
+              v-for="bar in financeBars"
+              :key="bar.date"
+              class="min-w-[28px] flex-1 h-full flex flex-col justify-end items-center"
+            >
+
+              <div
+                v-if="bar.amount > 0"
+                class="text-[9px] text-gray-500 mb-1 whitespace-nowrap"
+              >
+                {{ Math.round(bar.amount) }}
+              </div>
+
+              <div
+                class="bar w-full max-w-[24px] rounded-t-md bg-indigo-500"
+                :style="{height: bar.height + '%'}"
+              ></div>
+
+              <div class="text-[9px] text-gray-400 mt-1">
+                {{ bar.label }}
+              </div>
+
+            </div>
+
+          </div>
+
+          <div
+            v-else
+            class="text-center text-sm text-gray-400 py-8"
+          >
+            Нет данных за этот период
+          </div>
+
+        </div>
+
+      </section>
+
+
+      <!-- ================= SETTINGS ================= -->
+      <section v-if="activeTab === 'settings'">
+
+        <h1 class="text-2xl font-bold mb-4">
+          Настройки
+        </h1>
+
+
+        <!-- THEME -->
+        <settings-section title="Интерфейс">
+
+          <div class="text-sm font-medium mb-2">
+            Тема
+          </div>
+
+          <div class="grid grid-cols-3 gap-2">
+
+            <button
+              v-for="themeOption in themes"
+              :key="themeOption.id"
+              @click="theme = themeOption.id"
+              class="p-3 rounded-xl border text-sm"
+              :class="theme === themeOption.id
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40'
+                : 'border-gray-200 dark:border-gray-700'"
+            >
+              <div class="text-lg mb-1">
+                {{ themeOption.icon }}
+              </div>
+              {{ themeOption.name }}
+            </button>
+
+          </div>
+
+        </settings-section>
+
+
+        <!-- CURRENCY -->
+        <settings-section title="Валюта">
+
+          <select
+            v-model="currency"
+            class="field"
+          >
+            <option value="₴">Гривна (₴)</option>
+            <option value="$">Доллар ($)</option>
+            <option value="€">Евро (€)</option>
+          </select>
+
+        </settings-section>
+
+
+        <!-- NOTIFICATIONS -->
+        <settings-section title="Уведомления">
+
+          <div class="text-sm text-gray-500 dark:text-gray-400 mb-3">
+            Напоминание перед началом занятия
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+
+            <button
+              v-for="option in reminderOptions"
+              :key="option.value"
+              @click="setReminder(option.value)"
+              class="p-3 rounded-xl border text-sm text-left"
+              :class="reminderMinutes === option.value
+                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/40'
+                : 'border-gray-200 dark:border-gray-700'"
+            >
+              <div class="font-medium">
+                {{ option.name }}
+              </div>
+
+              <div class="text-xs text-gray-400 mt-1">
+                {{ option.description }}
+              </div>
+            </button>
+
+          </div>
+
+
+          <button
+            v-if="reminderMinutes > 0"
+            @click="requestNotificationPermission"
+            class="w-full mt-3 py-3 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm"
+          >
+            <i class="fa-regular fa-bell mr-2"></i>
+            Разрешить уведомления
+          </button>
+
+          <div
+            v-if="notificationStatus"
+            class="text-xs text-gray-500 dark:text-gray-400 mt-2"
+          >
+            {{ notificationStatus }}
+          </div>
+
+        </settings-section>
+
+
+        <!-- PAYMENT TYPES -->
+        <settings-section title="Расчёт оплаты">
+
+          <div class="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Здесь задаются правила, по которым приложение автоматически
+            рассчитывает стоимость занятия.
+          </div>
+
+
+          <div
+            v-for="type in lessonTypes"
+            :key="type.id"
+            class="mb-5 pb-5 border-b border-gray-100 dark:border-gray-800 last:border-0"
+          >
+
+            <div class="font-semibold mb-3">
+              {{ type.icon }} {{ type.name }}
+            </div>
+
+            <payment-editor
+              :rule="type.paymentRule"
+              @update="updateTypeRule(type, $event)"
+            />
+
+          </div>
+
+        </settings-section>
+
+
+        <!-- SCHOOLS -->
+        <settings-section title="Школы / места">
+
+          <div
+            v-for="school in schools"
+            :key="school.id"
+            class="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 mb-2"
+          >
+
+            <div class="flex items-center justify-between gap-2">
+
+              <div class="min-w-0">
+                <div class="font-medium truncate">
+                  {{ school.name }}
+                </div>
+
+                <div
+                  v-if="school.address"
+                  class="text-xs text-gray-500 truncate"
+                >
+                  {{ school.address }}
+                </div>
+
+                <div
+                  v-if="school.archived"
+                  class="text-xs text-orange-500 mt-1"
+                >
+                  Архив
+                </div>
+              </div>
+
+              <div class="flex gap-1 shrink-0">
+
+                <button
+                  @click="editSchool(school)"
+                  class="w-8 h-8 rounded-lg bg-white dark:bg-gray-700"
+                >
+                  <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+
+                <button
+                  @click="toggleSchoolArchive(school)"
+                  class="w-8 h-8 rounded-lg bg-white dark:bg-gray-700"
+                  :title="school.archived ? 'Восстановить' : 'Архивировать'"
+                >
+                  <i
+                    class="fa-solid text-xs"
+                    :class="school.archived ? 'fa-box-open' : 'fa-box-archive'"
+                  ></i>
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <button
+            @click="addSchool"
+            class="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium"
+          >
+            <i class="fa-solid fa-plus mr-2"></i>
+            Добавить школу
+          </button>
+
+        </settings-section>
+
+
+        <!-- GROUPS -->
+        <settings-section title="Группы">
+
+          <div
+            v-for="group in groups"
+            :key="group.id"
+            class="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 mb-2"
+          >
+
+            <div class="flex items-center justify-between gap-2">
+
+              <div class="min-w-0">
+
+                <div class="font-medium truncate">
+                  {{ group.name }}
+                </div>
+
+                <div class="text-xs text-gray-500">
+                  {{ schoolName(group.schoolId) || 'Без школы' }}
+                </div>
+
+                <div
+                  v-if="group.archived"
+                  class="text-xs text-orange-500 mt-1"
+                >
+                  Архив
+                </div>
+
+              </div>
+
+              <div class="flex gap-1 shrink-0">
+
+                <button
+                  @click="editGroup(group)"
+                  class="w-8 h-8 rounded-lg bg-white dark:bg-gray-700"
+                >
+                  <i class="fa-solid fa-pen text-xs"></i>
+                </button>
+
+                <button
+                  @click="toggleGroupArchive(group)"
+                  class="w-8 h-8 rounded-lg bg-white dark:bg-gray-700"
+                >
+                  <i
+                    class="fa-solid text-xs"
+                    :class="group.archived ? 'fa-box-open' : 'fa-box-archive'"
+                  ></i>
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+
+          <button
+            @click="addGroup"
+            class="w-full py-3 rounded-xl bg-indigo-600 text-white font-medium"
+          >
+            <i class="fa-solid fa-plus mr-2"></i>
+            Добавить группу
+          </button>
+
+        </settings-section>
+
+
+        <!-- DATA -->
+        <settings-section title="Данные">
+
+          <button
+            @click="exportData"
+            class="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 mb-2"
+          >
+            <i class="fa-solid fa-download mr-2"></i>
+            Экспортировать данные
+          </button>
+
+          <button
+            @click="$refs.importFile.click()"
+            class="w-full py-3 rounded-xl bg-gray-100 dark:bg-gray-800 mb-2"
+          >
+            <i class="fa-solid fa-upload mr-2"></i>
+            Восстановить из файла
+          </button>
+
+          <input
+            ref="importFile"
+            type="file"
+            accept=".json"
+            class="hidden"
+            @change="importData"
+          >
+
+
+          <button
+            @click="resetAll"
+            class="w-full py-3 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600"
+          >
+            <i class="fa-solid fa-triangle-exclamation mr-2"></i>
+            Удалить все данные
+          </button>
+
+        </settings-section>
+
+      </section>
+
+    </main>
+
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-800">
+
+      <div class="max-w-md md:max-w-2xl mx-auto grid grid-cols-5">
+
+        <button
+          @click="goToday"
+          class="py-3 flex flex-col items-center gap-1"
+          :class="activeTab === 'today'
+            ? 'text-indigo-600'
+            : 'text-gray-400'"
+        >
+          <i class="fa-solid fa-house"></i>
+          <span class="text-[10px]">Сегодня</span>
+        </button>
+
+        <button
+          @click="activeTab = 'calendar'"
+          class="py-3 flex flex-col items-center gap-1"
+          :class="activeTab === 'calendar'
+            ? 'text-indigo-600'
+            : 'text-gray-400'"
+        >
+          <i class="fa-solid fa-calendar-days"></i>
+          <span class="text-[10px]">Календарь</span>
+        </button>
+
+        <button
+          @click="openAdd(todayISO())"
+          class="py-3 flex flex-col items-center gap-1 text-indigo-600"
+        >
+          <div class="w-11 h-11 -mt-5 rounded-full bg-indigo-600 text-white flex items-center justify-center shadow-lg border-4 border-gray-100 dark:border-gray-950">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <span class="text-[10px]">Добавить</span>
+        </button>
+
+        <button
+          @click="activeTab = 'finance'"
+          class="py-3 flex flex-col items-center gap-1"
+          :class="activeTab === 'finance'
+            ? 'text-indigo-600'
+            : 'text-gray-400'"
+        >
+          <i class="fa-solid fa-wallet"></i>
+          <span class="text-[10px]">Финансы</span>
+        </button>
+
+        <button
+          @click="activeTab = 'settings'"
+          class="py-3 flex flex-col items-center gap-1"
+          :class="activeTab === 'settings'
+            ? 'text-indigo-600'
+            : 'text-gray-400'"
+        >
+          <i class="fa-solid fa-gear"></i>
+          <span class="text-[10px]">Настройки</span>
+        </button>
+
+      </div>
+    </nav>
+
+
+    <!-- ================= SCHOOL MODAL ================= -->
+    <div
+      v-if="schoolModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center"
+      @click.self="schoolModal = false"
+    >
+
+      <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-t-3xl md:rounded-3xl p-5">
+
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">
+            {{ schoolForm.id ? 'Изменить школу' : 'Новая школа' }}
+          </h2>
+
+          <button @click="schoolModal = false">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3">
+
+          <input
+            v-model="schoolForm.name"
+            class="field"
+            placeholder="Название"
+          >
+
+          <input
+            v-model="schoolForm.address"
+            class="field"
+            placeholder="Адрес"
+          >
+
+          <input
+            v-model="schoolForm.contact"
+            class="field"
+            placeholder="Контакт"
+          >
+
+          <textarea
+            v-model="schoolForm.note"
+            class="field resize-none"
+            rows="2"
+            placeholder="Заметка"
+          ></textarea>
+
+
+          <div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+
+            <div class="font-semibold mb-2">
+              Свой расчёт оплаты для этой школы
+            </div>
+
+            <payment-editor
+              :rule="schoolForm.paymentRule"
+              @update="schoolForm.paymentRule = $event"
+            />
+
+          </div>
+
+
+          <button
+            @click="saveSchool"
+            class="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold"
+          >
+            Сохранить
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- ================= GROUP MODAL ================= -->
+    <div
+      v-if="groupModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-end md:items-center justify-center"
+      @click.self="groupModal = false"
+    >
+
+      <div class="bg-white dark:bg-gray-900 w-full max-w-md rounded-t-3xl md:rounded-3xl p-5 max-h-[90vh] overflow-y-auto">
+
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-bold">
+            {{ groupForm.id ? 'Изменить группу' : 'Новая группа' }}
+          </h2>
+
+          <button @click="groupModal = false">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3">
+
+          <input
+            v-model="groupForm.name"
+            class="field"
+            placeholder="Название группы"
+          >
+
+          <select
+            v-model="groupForm.schoolId"
+            class="field"
+          >
+            <option value="">Без школы</option>
+
+            <option
+              v-for="school in selectableSchools"
+              :key="school.id"
+              :value="school.id"
+            >
+              {{ school.name }}
+            </option>
+          </select>
+
+
+          <div class="border-t border-gray-200 dark:border-gray-800 pt-4">
+
+            <div class="font-semibold mb-2">
+              Свой расчёт оплаты
+            </div>
+
+            <payment-editor
+              :rule="groupForm.paymentRule"
+              @update="groupForm.paymentRule = $event"
+            />
+
+          </div>
+
+
+          <button
+            @click="saveGroup"
+            class="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold"
+          >
+            Сохранить
+          </button>
+
+        </div>
+
+      </div>
+
+    </div>
+
+
+    <!-- TOAST -->
+    <transition name="fade">
+      <div
+        v-if="toast"
+        class="fixed left-4 right-4 bottom-24 z-[60] max-w-md mx-auto bg-gray-900 text-white rounded-xl px-4 py-3 text-sm shadow-xl"
+      >
+        {{ toast }}
+      </div>
+    </transition>
+
+  </div>
+</div>
+
+
+<script>
+const {
+  createApp,
+  ref,
+  reactive,
+  computed,
+  watch,
+  onMounted,
+  onBeforeUnmount
+} = Vue;
+
+
+/* =========================================================
+   COMPONENTS
+========================================================= */
+
+const FormField = {
+  props: ['label'],
+  template: `
+    <div>
+      <label class="text-sm font-medium block mb-1.5">
+        {{ label }}
+      </label>
+      <slot></slot>
+    </div>
+  `
+};
+
+
+const SettingsSection = {
+  props: ['title'],
+  template: `
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4 mb-4">
+      <h2 class="font-bold text-lg mb-4">{{ title }}</h2>
+      <slot></slot>
+    </div>
+  `
+};
+
+
+const StatCard = {
+  props: ['label', 'value', 'icon'],
+  template: `
+    <div class="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">
+            {{ label }}
+          </div>
+          <div class="font-bold text-lg mt-1">
+            {{ value }}
+          </div>
+        </div>
+        <i :class="'fa-solid ' + icon" class="text-indigo-500"></i>
+      </div>
+    </div>
+  `
+};
+
+
+/* PAYMENT EDITOR */
+const PaymentEditor = {
+  props: ['rule'],
+
+  emits: ['update'],
+
+  computed: {
+    localRule: {
+      get() {
+        return this.rule;
+      },
+
+      set(value) {
+        this.$emit('update', value);
+      }
+    }
+  },
+
+  methods: {
+
+    update(field, value) {
+      const r = this.clone();
+
+      if (field === 'mode') {
+        r.mode = value;
+      }
+
+      if (field === 'fixed') {
+        r.fixed = Number(value) || 0;
+      }
+
+      if (field === 'perPerson') {
+        r.perPerson = Number(value) || 0;
+      }
+
+      if (field === 'minPayment') {
+        r.minPayment = Number(value) || 0;
+      }
+
+      this.$emit('update', r);
+    },
+
+    clone() {
+      return JSON.parse(JSON.stringify(this.rule || {
+        mode: 'fixed',
+        fixed: 0,
+        perPerson: 0,
+        minPayment: 0,
+        ranges: []
+      }));
+    },
+
+    addRange() {
+      const r = this.clone();
+
+      if (!Array.isArray(r.ranges)) {
+        r.ranges = [];
+      }
+
+      r.ranges.push({
+        min: 1,
+        max: null,
+        amount: 0
+      });
+
+      this.$emit('update', r);
+    },
+
+    removeRange(index) {
+      const r = this.clone();
+      r.ranges.splice(index, 1);
+      this.$emit('update', r);
+    },
+
+    updateRange(index, field, value) {
+      const r = this.clone();
+
+      if (field === 'min') {
+        r.ranges[index].min = Number(value) || 0;
+      }
+
+      if (field === 'max') {
+        r.ranges[index].max =
+          value === '' || value === null
+            ? null
+            : Number(value);
+      }
+
+      if (field === 'amount') {
+        r.ranges[index].amount = Number(value) || 0;
+      }
+
+      this.$emit('update', r);
+    }
+
+  },
+
+  template: `
+    <div class="space-y-3">
+
+      <select
+        :value="rule.mode"
+        @change="update('mode', $event.target.value)"
+        class="field"
+      >
+        <option value="fixed">Фиксированная сумма</option>
+        <option value="perPerson">За каждого человека</option>
+        <option value="ranges">По количеству людей</option>
+        <option value="manual">Вводить вручную</option>
+      </select>
+
+
+      <div v-if="rule.mode === 'fixed'">
+
+        <label class="text-xs text-gray-500 block mb-1">
+          Сумма
+        </label>
+
+        <input
+          type="number"
+          min="0"
+          :value="rule.fixed"
+          @input="update('fixed', $event.target.value)"
+          class="field"
+          placeholder="0"
+        >
+
+      </div>
+
+
+      <div v-if="rule.mode === 'perPerson'">
+
+        <label class="text-xs text-gray-500 block mb-1">
+          Сумма за человека
+        </label>
+
+        <input
+          type="number"
+          min="0"
+          :value="rule.perPerson"
+          @input="update('perPerson', $event.target.value)"
+          class="field"
+          placeholder="0"
+        >
+
+        <label class="text-xs text-gray-500 block mt-3 mb-1">
+          Минимальная оплата
+        </label>
+
+        <input
+          type="number"
+          min="0"
+          :value="rule.minPayment"
+          @input="update('minPayment', $event.target.value)"
+          class="field"
+          placeholder="0"
+        >
+
+      </div>
+
+
+      <div v-if="rule.mode === 'ranges'">
+
+        <div
+          v-for="(range, index) in rule.ranges"
+          :key="index"
+          class="bg-gray-50 dark:bg-gray-800/70 rounded-xl p-3 mb-2"
+        >
+
+          <div class="grid grid-cols-[1fr_1fr_1.3fr_auto] gap-2 items-end">
+
+            <div>
+              <label class="text-[10px] text-gray-500">
+                От
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                :value="range.min"
+                @input="updateRange(index, 'min', $event.target.value)"
+                class="small-field"
+              >
+            </div>
+
+            <div>
+              <label class="text-[10px] text-gray-500">
+                До
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                :value="range.max"
+                @input="updateRange(index, 'max', $event.target.value)"
+                class="small-field"
+                placeholder="∞"
+              >
+            </div>
+
+            <div>
+              <label class="text-[10px] text-gray-500">
+                Сумма
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                :value="range.amount"
+                @input="updateRange(index, 'amount', $event.target.value)"
+                class="small-field"
+                placeholder="0"
+              >
+            </div>
+
+            <button
+              @click="removeRange(index)"
+              class="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500"
+            >
+              <i class="fa-solid fa-trash text-xs"></i>
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <button
+          @click="addRange"
+          class="w-full py-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm"
+        >
+          <i class="fa-solid fa-plus mr-1"></i>
+          Добавить диапазон
+        </button>
+
+
+        <div class="text-xs text-gray-400 mt-2">
+          Если поле «До» оставить пустым, диапазон будет действовать до бесконечности.
+        </div>
+
+      </div>
+
+
+      <div
+        v-if="rule.mode === 'manual'"
+        class="text-xs text-gray-500 dark:text-gray-400"
+      >
+        При создании занятия сумма будет рассчитана как 0, но её можно сразу указать вручную.
+      </div>
+
+    </div>
+  `
+};
+
+
+/* =========================================================
+   APP
+========================================================= */
+
+const app = createApp({
+
+  components: {
+    'form-field': FormField,
+    'settings-section': SettingsSection,
+    'stat-card': StatCard,
+    'payment-editor': PaymentEditor
+  },
+
+
+  setup() {
+
+    /* ================= STORAGE ================= */
+
+    const STORAGE = {
+      currency: 'dp_currency',
+      schools: 'dp_schools',
+      groups: 'dp_groups',
+      lessons: 'dp_lessons',
+      types: 'dp_types',
+      theme: 'dp_theme',
+      reminder: 'dp_reminder',
+      notified: 'dp_notified'
+    };
+
+
+    function load(key, fallback) {
+      try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : JSON.parse(value);
+      } catch {
+        return fallback;
+      }
+    }
+
+
+    function save(key, value) {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+
+
+    /* ================= HELPERS ================= */
+
+    function uid(prefix = 'id') {
+      if (window.crypto && crypto.randomUUID) {
+        return prefix + '_' + crypto.randomUUID();
+      }
+
+      return prefix + '_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    }
+
+
+    function todayISO() {
+      const d = new Date();
+
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+
+      return `${y}-${m}-${day}`;
+    }
+
+
+    function dateFromISO(value) {
+      const [y, m, d] = value.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+
+    function isoFromDate(date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+
+      return `${y}-${m}-${d}`;
+    }
+
+
+    function addDays(value, amount) {
+      const d = dateFromISO(value);
+      d.setDate(d.getDate() + amount);
+      return isoFromDate(d);
+    }
+
+
+    function startOfWeek(value) {
+      const d = dateFromISO(value);
+      const day = d.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+
+      d.setDate(d.getDate() + diff);
+
+      return isoFromDate(d);
+    }
+
+
+    function endOfWeek(value) {
+      return addDays(startOfWeek(value), 6);
+    }
+
+
+    function daysBetween(start, end) {
+      const result = [];
+      let current = start;
+
+      while (current <= end) {
+        result.push(current);
+        current = addDays(current, 1);
+      }
+
+      return result;
+    }
+
+
+    function durationHours(start, end) {
+      if (!start || !end) return 0;
+
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+
+      let minutes = eh * 60 + em - (sh * 60 + sm);
+
+      if (minutes < 0) {
+        minutes += 24 * 60;
+      }
+
+      return minutes / 60;
+    }
+
+
+    function formatDate(value, options) {
+      if (!value) return '';
+
+      return dateFromISO(value).toLocaleDateString(
+        'ru-RU',
+        options
+      );
+    }
+
+
+    function formatLongDate(value) {
+      return formatDate(value, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+    }
+
+
+    function formatShortDate(value) {
+      return formatDate(value, {
+        day: 'numeric',
+        month: 'short'
+      });
+    }
+
+
+    function formatWeekDay(value) {
+      return formatDate(value, {
+        weekday: 'long'
+      }).replace(/^./, x => x.toUpperCase());
+    }
+
+
+    function monthName(value) {
+      return formatDate(value, {
+        month: 'long',
+        year: 'numeric'
+      }).replace(/^./, x => x.toUpperCase());
+    }
+
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+
+    function defaultPaymentRule() {
+      return {
+        mode: 'fixed',
+        fixed: 0,
+        perPerson: 0,
+        minPayment: 0,
+        ranges: []
+      };
+    }
+
+
+    function normalizeRule(rule) {
+      const r = Object.assign(
+        defaultPaymentRule(),
+        deepClone(rule || {})
+      );
+
+      r.fixed = Number(r.fixed) || 0;
+      r.perPerson = Number(r.perPerson) || 0;
+      r.minPayment = Number(r.minPayment) || 0;
+
+      if (!Array.isArray(r.ranges)) {
+        r.ranges = [];
+      }
+
+      return r;
+    }
+
+
+    function defaultTypes() {
+      return [
+        {
+          id: 'indiv',
+          name: 'Индивидуалка',
+          icon: '💃',
+          color: '#ec4899',
+          paymentRule: {
+            ...defaultPaymentRule(),
+            mode: 'fixed'
+          }
+        },
+        {
+          id: 'group',
+          name: 'Группа',
+          icon: '👥',
+          color: '#6366f1',
+          paymentRule: {
+            ...defaultPaymentRule(),
+            mode: 'perPerson'
+          }
+        },
+        {
+          id: 'sub',
+          name: 'Замена',
+          icon: '🔄',
+          color: '#f59e0b',
+          paymentRule: {
+            ...defaultPaymentRule(),
+            mode: 'fixed'
+          }
+        },
+        {
+          id: 'reh',
+          name: 'Репетиция',
+          icon: '🎭',
+          color: '#8b5cf6',
+          paymentRule: {
+            ...defaultPaymentRule(),
+            mode: 'fixed'
+          }
+        },
+        {
+          id: 'other',
+          name: 'Другое',
+          icon: '📌',
+          color: '#64748b',
+          paymentRule: {
+            ...defaultPaymentRule(),
+            mode: 'manual'
+          }
+        }
+      ];
+    }
+
+
+    /* ================= DATA ================= */
+
+    const currency = ref(
+      load(STORAGE.currency, '₴')
+    );
+
+    const theme = ref(
+      load(STORAGE.theme, 'system')
+    );
+
+    const reminderMinutes = ref(
+      Number(load(STORAGE.reminder, 60))
+    );
+
+
+    const schools = ref(
+      load(STORAGE.schools, [])
+    );
+
+
+    const groups = ref(
+      load(STORAGE.groups, [])
+    );
+
+
+    const lessons = ref(
+      load(STORAGE.lessons, [])
+    );
+
+
+    const savedTypes = load(STORAGE.types, null);
+
+    const lessonTypes = ref(
+      savedTypes && Array.isArray(savedTypes)
+        ? savedTypes.map(t => ({
+            ...t,
+            paymentRule: normalizeRule(t.paymentRule)
+          }))
+        : defaultTypes()
+    );
+
+
+    /* ================= UI ================= */
+
+    const activeTab = ref('today');
+
+    const selectedDate = ref(todayISO());
+
+    const calendarMode = ref('week');
+
+    const financePeriod = ref('week');
+
+    const financeDate = ref(todayISO());
+
+    const financeStartCustom = ref(
+      startOfWeek(todayISO())
+    );
+
+    const financeEndCustom = ref(
+      endOfWeek(todayISO())
+    );
+
+
+    const formMode = ref('add');
+
+    const editingLessonId = ref(null);
+
+
+    const toast = ref('');
+
+    let toastTimer = null;
+
+
+    const schoolModal = ref(false);
+
+    const groupModal = ref(false);
+
+
+    const schoolForm = reactive({
+      id: null,
+      name: '',
+      address: '',
+      contact: '',
+      note: '',
+      paymentRule: defaultPaymentRule()
+    });
+
+
+    const groupForm = reactive({
+      id: null,
+      name: '',
+      schoolId: '',
+      paymentRule: defaultPaymentRule()
+    });
+
+
+    /* ================= NEW LESSON ================= */
+
+    function emptyLesson(date = todayISO()) {
+
+      return {
+        id: null,
+        date,
+        start: '18:00',
+        end: '19:00',
+        typeId: 'group',
+        studentName: '',
+        groupId: '',
+        schoolId: '',
+        peopleCount: 1,
+        otherText: '',
+        price: 0,
+        note: '',
+        status: 'planned'
+      };
+
+    }
+
+
+    const newLesson = reactive(
+      emptyLesson()
+    );
+
+
+    /* ================= CONSTANTS ================= */
+
+    const calendarModes = [
+      {id: 'day', name: 'День'},
+      {id: 'week', name: 'Неделя'},
+      {id: 'month', name: 'Месяц'}
+    ];
+
+
+    const weekNames = [
+      'Пн',
+      'Вт',
+      'Ср',
+      'Чт',
+      'Пт',
+      'Сб',
+      'Вс'
+    ];
+
+
+    const themes = [
+      {
+        id: 'light',
+        name: 'Светлая',
+        icon: '☀️'
+      },
+      {
+        id: 'dark',
+        name: 'Тёмная',
+        icon: '🌙'
+      },
+      {
+        id: 'system',
+        name: 'Система',
+        icon: '⚙️'
+      }
+    ];
+
+
+    const reminderOptions = [
+      {
+        value: 0,
+        name: 'Отключены',
+        description: 'Без уведомлений'
+      },
+      {
+        value: 60,
+        name: 'За 1 час',
+        description: 'Напомнить за 60 минут'
+      },
+      {
+        value: 120,
+        name: 'За 2 часа',
+        description: 'Напомнить за 120 минут'
+      },
+      {
+        value: 180,
+        name: 'За 3 часа',
+        description: 'Напомнить за 180 минут'
+      }
+    ];
+
+
+    /* ================= COMPUTED ================= */
+
+    const headerDate = computed(() => {
+      return formatLongDate(todayISO());
+    });
+
+
+    const selectableSchools = computed(() => {
+      return schools.value.filter(s => !s.archived);
+    });
+
+
+    const selectableGroups = computed(() => {
+      return groups.value.filter(g => !g.archived);
+    });
+
+
+    const todayLessons = computed(() => {
+      return lessons.value.filter(
+        l => l.date === todayISO()
+      );
+    });
+
+
+    const sortedTodayLessons = computed(() => {
+      return [...todayLessons.value].sort(
+        (a, b) => a.start.localeCompare(b.start)
+      );
+    });
+
+
+    const selectedDayLessons = computed(() => {
+      return lessons.value
+        .filter(l => l.date === selectedDate.value)
+        .sort((a, b) => a.start.localeCompare(b.start));
+    });
+
+
+    const todayStats = computed(() => {
+      const list = todayLessons.value;
+
+      return {
+        lessons: list.filter(l => l.status !== 'cancelled').length,
+
+        hours: round(
+          list
+            .filter(l => l.status !== 'cancelled')
+            .reduce(
+              (sum, l) => sum + durationHours(l.start, l.end),
+              0
+            )
+        ),
+
+        people: list.reduce(
+          (sum, l) =>
+            sum + (Number(l.peopleCount) || 0),
+          0
+        ),
+
+        earned: list
+          .filter(l => l.status === 'conducted')
+          .reduce(
+            (sum, l) => sum + Number(l.price || 0),
+            0
+          )
+      };
+    });
+
+
+    const calendarTitle = computed(() => {
+
+      if (calendarMode.value === 'month') {
+        return monthName(
+          selectedDate.value
+        );
+      }
+
+      if (calendarMode.value === 'week') {
+        return `${formatShortDate(startOfWeek(selectedDate.value))} — ${formatShortDate(endOfWeek(selectedDate.value))}`;
+      }
+
+      return formatLongDate(selectedDate.value);
+
+    });
+
+
+    const weekDays = computed(() => {
+
+      const start = startOfWeek(selectedDate.value);
+
+      return daysBetween(
+        start,
+        addDays(start, 6)
+      ).map(date => ({
+        date,
+        lessons: lessons.value
+          .filter(l => l.date === date)
+          .sort((a, b) => a.start.localeCompare(b.start))
+      }));
+
+    });
+
+
+    const monthCells = computed(() => {
+
+      const d = dateFromISO(selectedDate.value);
+
+      const year = d.getFullYear();
+
+      const month = d.getMonth();
+
+      const first = new Date(year, month, 1);
+
+      let offset = first.getDay() - 1;
+
+      if (offset < 0) {
+        offset = 6;
+      }
+
+      const count = new Date(
+        year,
+        month + 1,
+        0
+      ).getDate();
+
+      const cells = [];
+
+      for (let i = 0; i < offset; i++) {
+        cells.push({
+          date: null,
+          day: null,
+          lessons: []
+        });
+      }
+
+      for (let day = 1; day <= count; day++) {
+
+        const date = isoFromDate(
+          new Date(year, month, day)
+        );
+
+        cells.push({
+          date,
+          day,
+          lessons: lessons.value
+            .filter(l => l.date === date)
+            .sort((a, b) => a.start.localeCompare(b.start))
+        });
+
+      }
+
+      while (cells.length % 7 !== 0) {
+        cells.push({
+          date: null,
+          day: null,
+          lessons: []
+        });
+      }
+
+      return cells;
+
+    });
+
+
+    const financeStart = computed(() => {
+
+      if (financePeriod.value === 'week') {
+        return startOfWeek(financeDate.value);
+      }
+
+      if (financePeriod.value === 'month') {
+
+        const d = dateFromISO(
+          financeDate.value
+        );
+
+        return isoFromDate(
+          new Date(
+            d.getFullYear(),
+            d.getMonth(),
+            1
+          )
+        );
+
+      }
+
+      return financeStartCustom.value;
+
+    });
+
+
+    const financeEnd = computed(() => {
+
+      if (financePeriod.value === 'week') {
+        return endOfWeek(financeDate.value);
+      }
+
+      if (financePeriod.value === 'month') {
+
+        const d = dateFromISO(
+          financeDate.value
+        );
+
+        return isoFromDate(
+          new Date(
+            d.getFullYear(),
+            d.getMonth() + 1,
+            0
+          )
+        );
+
+      }
+
+      return financeEndCustom.value;
+
+    });
+
+
+    const financeLessons = computed(() => {
+
+      return lessons.value.filter(l =>
+        l.date >= financeStart.value &&
+        l.date <= financeEnd.value
+      );
+
+    });
+
+
+    const financeStats = computed(() => {
+
+      const list = financeLessons.value;
+
+      const conducted = list.filter(
+        l => l.status === 'conducted'
+      );
+
+      const planned = list.filter(
+        l => l.status === 'planned'
+      );
+
+
+      const earned = conducted.reduce(
+        (sum, l) => sum + Number(l.price || 0),
+        0
+      );
+
+
+      const plannedAmount = planned.reduce(
+        (sum, l) => sum + Number(l.price || 0),
+        0
+      );
+
+
+      const hours = conducted.reduce(
+        (sum, l) => sum + durationHours(l.start, l.end),
+        0
+      );
+
+
+      const people = conducted.reduce(
+        (sum, l) => sum + Number(l.peopleCount || 0),
+        0
+      );
+
+
+      return {
+        earned,
+        planned: plannedAmount,
+        lessons: conducted.length,
+        hours: round(hours),
+        people,
+        average: conducted.length
+          ? earned / conducted.length
+          : 0
+      };
+
+    });
+
+
+    const financeBars = computed(() => {
+
+      const dates = daysBetween(
+        financeStart.value,
+        financeEnd.value
+      );
+
+      const amounts = dates.map(date => {
+
+        return financeLessons.value
+          .filter(
+            l =>
+              l.date === date &&
+              l.status === 'conducted'
+          )
+          .reduce(
+            (sum, l) =>
+              sum + Number(l.price || 0),
+            0
+          );
+
+      });
+
+
+      const max = Math.max(
+        ...amounts,
+        1
+      );
+
+
+      return dates.map((date, index) => {
+
+        const amount = amounts[index];
+
+        return {
+          date,
+          amount,
+          height: amount
+            ? Math.max(
+                5,
+                amount / max * 100
+              )
+            : 0,
+          label: dateFromISO(date).getDate()
+        };
+
+      });
+
+    });
+
+
+    const autoCalculatedPrice = computed(() => {
+
+      return calculatePrice({
+        ...newLesson
+      });
+
+    });
+
+
+    const notificationStatus = ref('');
+
+
+    /* ================= PAYMENT ================= */
+
+    function getType(typeId) {
+      return lessonTypes.value.find(
+        t => t.id === typeId
+      );
+    }
+
+
+    function getSchool(id) {
+      return schools.value.find(
+        s => s.id === id
+      );
+    }
+
+
+    function getGroup(id) {
+      return groups.value.find(
+        g => g.id === id
+      );
+    }
+
+
+    function resolvePaymentRule(lesson) {
+
+      const group = getGroup(
+        lesson.groupId
+      );
+
+      if (
+        group &&
+        group.paymentRule &&
+        group.useCustomPayment !== false
+      ) {
+        return normalizeRule(
+          group.paymentRule
+        );
+      }
+
+
+      const school = getSchool(
+        lesson.schoolId
+      );
+
+      if (
+        school &&
+        school.paymentRule &&
+        school.useCustomPayment === true
+      ) {
+        return normalizeRule(
+          school.paymentRule
+        );
+      }
+
+
+      const type = getType(
+        lesson.typeId
+      );
+
+      if (type) {
+        return normalizeRule(
+          type.paymentRule
+        );
+      }
+
+
+      return defaultPaymentRule();
+
+    }
+
+
+    function calculatePrice(lesson) {
+
+      const rule =
+        resolvePaymentRule(lesson);
+
+
+      const people =
+        Number(lesson.peopleCount) || 0;
+
+
+      if (rule.mode === 'manual') {
+        return 0;
+      }
+
+
+      if (rule.mode === 'fixed') {
+        return Number(rule.fixed) || 0;
+      }
+
+
+      if (rule.mode === 'perPerson') {
+
+        const amount =
+          people * Number(rule.perPerson || 0);
+
+        return Math.max(
+          amount,
+          Number(rule.minPayment || 0)
+        );
+
+      }
+
+
+      if (rule.mode === 'ranges') {
+
+        const sorted = [...rule.ranges].sort(
+          (a, b) =>
+            Number(a.min || 0) -
+            Number(b.min || 0)
+        );
+
+
+        for (const range of sorted) {
+
+          const min =
+            Number(range.min || 0);
+
+          const max =
+            range.max === null ||
+            range.max === '' ||
+            range.max === undefined
+              ? Infinity
+              : Number(range.max);
+
+
+          if (
+            people >= min &&
+            people <= max
+          ) {
+
+            return Math.max(
+              Number(range.amount || 0),
+              Number(rule.minPayment || 0)
+            );
+
+          }
+
+        }
+
+        return 0;
+      }
+
+
+      return 0;
+
+    }
+
+
+    function recalculatePrice() {
+
+      newLesson.price =
+        autoCalculatedPrice.value;
+
+    }
+
+
+    /* ================= LESSON FORM ================= */
+
+    function resetLessonForm(date = todayISO()) {
+
+      Object.assign(
+        newLesson,
+        emptyLesson(date)
+      );
+
+    }
+
+
+    function openAdd(date = todayISO()) {
+
+      formMode.value = 'add';
+
+      editingLessonId.value = null;
+
+      resetLessonForm(date);
+
+      activeTab.value = 'add';
+
+    }
+
+
+    function editLesson(lesson) {
+
+      formMode.value = 'edit';
+
+      editingLessonId.value =
+        lesson.id;
+
+      Object.assign(
+        newLesson,
+        deepClone(lesson)
+      );
+
+      activeTab.value = 'add';
+
+    }
+
+
+    function copyLesson(lesson) {
+
+      formMode.value = 'copy';
+
+      editingLessonId.value = null;
+
+
+      const copy =
+        deepClone(lesson);
+
+
+      copy.id = null;
+
+      copy.date =
+        addDays(lesson.date, 1);
+
+      copy.status = 'planned';
+
+
+      Object.assign(
+        newLesson,
+        copy
+      );
+
+
+      activeTab.value = 'add';
+
+
+      showToast(
+        'Создана копия. Исходное занятие не изменено.'
+      );
+
+    }
+
+
+    function cancelForm() {
+
+      activeTab.value =
+        newLesson.date === todayISO()
+          ? 'today'
+          : 'calendar';
+
+    }
+
+
+    function onLessonTypeChanged() {
+
+      if (newLesson.typeId === 'indiv') {
+        newLesson.peopleCount = 1;
+      }
+
+      if (
+        ['group', 'sub', 'reh'].includes(
+          newLesson.typeId
+        )
+      ) {
+
+        if (
+          Number(newLesson.peopleCount) < 1
+        ) {
+          newLesson.peopleCount = 1;
+        }
+
+      }
+
+      recalculatePrice();
+
+    }
+
+
+    function onGroupChanged() {
+
+      const group =
+        getGroup(newLesson.groupId);
+
+
+      if (group && group.schoolId) {
+        newLesson.schoolId =
+          group.schoolId;
+      }
+
+
+      recalculatePrice();
+
+    }
+
+
+    function changePeople(delta) {
+
+      const next =
+        Math.max(
+          0,
+          Number(newLesson.peopleCount || 0) +
+          delta
+        );
+
+
+      newLesson.peopleCount =
+        next;
+
+
+      recalculatePrice();
+
+    }
+
+
+    function saveLesson() {
+
+      if (!newLesson.date) {
+        showToast('Укажи дату');
+        return;
+      }
+
+
+      if (!newLesson.start || !newLesson.end) {
+        showToast('Укажи время');
+        return;
+      }
+
+
+      if (
+        newLesson.typeId === 'other' &&
+        !newLesson.otherText.trim()
+      ) {
+        showToast('Напиши, что именно означает «Другое»');
+        return;
+      }
+
+
+      if (
+        newLesson.typeId === 'indiv' &&
+        !newLesson.studentName.trim()
+      ) {
+        showToast('Укажи ученика');
+        return;
+      }
+
+
+      if (
+        ['group','sub','reh'].includes(newLesson.typeId) &&
+        !newLesson.groupId
+      ) {
+        showToast('Выбери группу');
+        return;
+      }
+
+
+      const data = deepClone(
+        newLesson
+      );
+
+
+      data.price =
+        Number(data.price) || 0;
+
+
+      data.peopleCount =
+        Number(data.peopleCount) || 0;
+
+
+      if (formMode.value === 'edit') {
+
+        const index =
+          lessons.value.findIndex(
+            l => l.id === editingLessonId.value
+          );
+
+
+        if (index !== -1) {
+
+          lessons.value[index] = {
+            ...lessons.value[index],
+            ...data,
+            id: editingLessonId.value
+          };
+
+          save(
+            STORAGE.lessons,
+            lessons.value
+          );
+
+          showToast('Занятие изменено');
+
+        }
+
+      } else {
+
+        data.id = uid('lesson');
+
+        lessons.value.push(data);
+
+        save(
+          STORAGE.lessons,
+          lessons.value
+        );
+
+        showToast(
+          formMode.value === 'copy'
+            ? 'Копия сохранена'
+            : 'Занятие создано'
+        );
+
+      }
+
+
+      selectedDate.value =
+        data.date;
+
+
+      if (data.date === todayISO()) {
+        activeTab.value = 'today';
+      } else {
+        activeTab.value = 'calendar';
+      }
+
+    }
+
+
+    function deleteLesson(lesson) {
+
+      if (
+        !confirm(
+          'Удалить это занятие?'
+        )
+      ) {
+        return;
+      }
+
+
+      lessons.value =
+        lessons.value.filter(
+          l => l.id !== lesson.id
+        );
+
+
+      save(
+        STORAGE.lessons,
+        lessons.value
+      );
+
+
+      showToast(
+        'Занятие удалено'
+      );
+
+    }
+
+
+    function setStatus(lesson, status) {
+
+      lesson.status = status;
+
+      save(
+        STORAGE.lessons,
+        lessons.value
+      );
+
+
+      showToast(
+        status === 'conducted'
+          ? 'Занятие отмечено как проведённое'
+          : status === 'cancelled'
+            ? 'Занятие отменено'
+            : 'Занятие возвращено в план'
+      );
+
+    }
+
+
+    /* ================= CALENDAR ================= */
+
+    function calendarPrev() {
+
+      if (calendarMode.value === 'day') {
+        selectedDate.value =
+          addDays(selectedDate.value, -1);
+        return;
+      }
+
+
+      if (calendarMode.value === 'week') {
+        selectedDate.value =
+          addDays(selectedDate.value, -7);
+        return;
+      }
+
+
+      const d =
+        dateFromISO(selectedDate.value);
+
+      d.setMonth(d.getMonth() - 1);
+
+      selectedDate.value =
+        isoFromDate(d);
+
+    }
+
+
+    function calendarNext() {
+
+      if (calendarMode.value === 'day') {
+        selectedDate.value =
+          addDays(selectedDate.value, 1);
+        return;
+      }
+
+
+      if (calendarMode.value === 'week') {
+        selectedDate.value =
+          addDays(selectedDate.value, 7);
+        return;
+      }
+
+
+      const d =
+        dateFromISO(selectedDate.value);
+
+      d.setMonth(d.getMonth() + 1);
+
+      selectedDate.value =
+        isoFromDate(d);
+
+    }
+
+
+    function copyWeek() {
+
+      const sourceStart =
+        startOfWeek(selectedDate.value);
+
+      const sourceEnd =
+        endOfWeek(selectedDate.value);
+
+
+      const source =
+        lessons.value.filter(l =>
+          l.date >= sourceStart &&
+          l.date <= sourceEnd &&
+          ['group', 'reh'].includes(l.typeId)
+        );
+
+
+      if (!source.length) {
+
+        showToast(
+          'В этой неделе нет групповых занятий или репетиций для копирования'
+        );
+
+        return;
+
+      }
+
+
+      let copied = 0;
+
+
+      source.forEach(original => {
+
+        const newDate =
+          addDays(original.date, 7);
+
+
+        const exists =
+          lessons.value.some(l =>
+            l.date === newDate &&
+            l.start === original.start &&
+            l.end === original.end &&
+            l.typeId === original.typeId &&
+            l.groupId === original.groupId
+          );
+
+
+        if (exists) {
+          return;
+        }
+
+
+        const copy =
+          deepClone(original);
+
+
+        copy.id = uid('lesson');
+
+        copy.date = newDate;
+
+        copy.status = 'planned';
+
+
+        lessons.value.push(copy);
+
+        copied++;
+
+      });
+
+
+      save(
+        STORAGE.lessons,
+        lessons.value
+      );
+
+
+      showToast(
+        copied
+          ? `Скопировано занятий: ${copied}`
+          : 'Все такие занятия уже существуют'
+      );
+
+    }
+
+
+    /* ================= SCHOOLS ================= */
+
+    function addSchool() {
+
+      Object.assign(
+        schoolForm,
+        {
+          id: null,
+          name: '',
+          address: '',
+          contact: '',
+          note: '',
+          paymentRule: defaultPaymentRule(),
+          useCustomPayment: false
+        }
+      );
+
+
+      schoolModal.value = true;
+
+    }
+
+
+    function editSchool(school) {
+
+      Object.assign(
+        schoolForm,
+        deepClone(school)
+      );
+
+
+      schoolForm.paymentRule =
+        normalizeRule(
+          school.paymentRule
+        );
+
+
+      schoolModal.value = true;
+
+    }
+
+
+    function saveSchool() {
+
+      if (!schoolForm.name.trim()) {
+        showToast('Укажи название школы');
+        return;
+      }
+
+
+      const data =
+        deepClone(schoolForm);
+
+
+      data.name =
+        data.name.trim();
+
+
+      if (data.id) {
+
+        const index =
+          schools.value.findIndex(
+            s => s.id === data.id
+          );
+
+
+        if (index !== -1) {
+          schools.value[index] = data;
+        }
+
+      } else {
+
+        data.id = uid('school');
+
+        data.archived = false;
+
+        schools.value.push(data);
+
+      }
+
+
+      save(
+        STORAGE.schools,
+        schools.value
+      );
+
+
+      schoolModal.value = false;
+
+      showToast('Школа сохранена');
+
+    }
+
+
+    function toggleSchoolArchive(school) {
+
+      school.archived =
+        !school.archived;
+
+
+      save(
+        STORAGE.schools,
+        schools.value
+      );
+
+
+      showToast(
+        school.archived
+          ? 'Школа отправлена в архив'
+          : 'Школа восстановлена'
+      );
+
+    }
+
+
+    /* ================= GROUPS ================= */
+
+    function addGroup() {
+
+      Object.assign(
+        groupForm,
+        {
+          id: null,
+          name: '',
+          schoolId: '',
+          paymentRule: defaultPaymentRule(),
+          useCustomPayment: true
+        }
+      );
+
+
+      groupModal.value = true;
+
+    }
+
+
+    function editGroup(group) {
+
+      Object.assign(
+        groupForm,
+        deepClone(group)
+      );
+
+
+      groupForm.paymentRule =
+        normalizeRule(
+          group.paymentRule
+        );
+
+
+      groupModal.value = true;
+
+    }
+
+
+    function saveGroup() {
+
+      if (!groupForm.name.trim()) {
+        showToast('Укажи название группы');
+        return;
+      }
+
+
+      const data =
+        deepClone(groupForm);
+
+
+      data.name =
+        data.name.trim();
+
+
+      if (data.id) {
+
+        const index =
+          groups.value.findIndex(
+            g => g.id === data.id
+          );
+
+
+        if (index !== -1) {
+          groups.value[index] = data;
+        }
+
+      } else {
+
+        data.id = uid('group');
+
+        data.archived = false;
+
+        groups.value.push(data);
+
+      }
+
+
+      save(
+        STORAGE.groups,
+        groups.value
+      );
+
+
+      groupModal.value = false;
+
+      showToast('Группа сохранена');
+
+    }
+
+
+    function toggleGroupArchive(group) {
+
+      group.archived =
+        !group.archived;
+
+
+      save(
+        STORAGE.groups,
+        groups.value
+      );
+
+
+      showToast(
+        group.archived
+          ? 'Группа отправлена в архив'
+          : 'Группа восстановлена'
+      );
+
+    }
+
+
+    /* ================= TYPE RULES ================= */
+
+    function updateTypeRule(type, rule) {
+
+      type.paymentRule =
+        normalizeRule(rule);
+
+
+      save(
+        STORAGE.types,
+        lessonTypes.value
+      );
+
+
+      /*
+       * ВАЖНО:
+       * уже созданные занятия не пересчитываются.
+       * Их сохранённая сумма остаётся такой,
+       * какой была при создании/редактировании.
+       */
+
+    }
+
+
+    /* ================= DISPLAY ================= */
+
+    function typeName(id) {
+
+      const type =
+        getType(id);
+
+      return type
+        ? type.name
+        : 'Неизвестно';
+
+    }
+
+
+    function typeColor(id) {
+
+      const type =
+        getType(id);
+
+      return type
+        ? type.color
+        : '#64748b';
+
+    }
+
+
+    function schoolName(id) {
+
+      if (!id) return '';
+
+      const school =
+        getSchool(id);
+
+      return school
+        ? school.name
+        : '';
+
+    }
+
+
+    function groupName(id) {
+
+      if (!id) return '';
+
+      const group =
+        getGroup(id);
+
+      return group
+        ? group.name
+        : '';
+
+    }
+
+
+    function lessonTitle(lesson) {
+
+      if (
+        lesson.typeId === 'indiv'
+      ) {
+        return lesson.studentName ||
+          'Индивидуальное занятие';
+      }
+
+
+      if (
+        lesson.typeId === 'other'
+      ) {
+        return lesson.otherText ||
+          'Другое';
+      }
+
+
+      if (lesson.groupId) {
+        return groupName(
+          lesson.groupId
+        );
+      }
+
+
+      return typeName(
+        lesson.typeId
+      );
+
+    }
+
+
+    function statusName(status) {
+
+      if (status === 'conducted') {
+        return 'Проведено';
+      }
+
+      if (status === 'cancelled') {
+        return 'Отменено';
+      }
+
+      return 'Запланировано';
+
+    }
+
+
+    function pluralPeople(number) {
+
+      const n = Math.abs(
+        Number(number)
+      ) % 100;
+
+      const n1 = n % 10;
+
+      if (n > 10 && n < 20) {
+        return 'человек';
+      }
+
+      if (n1 === 1) {
+        return 'человек';
+      }
+
+      if (
+        n1 >= 2 &&
+        n1 <= 4
+      ) {
+        return 'человека';
+      }
+
+      return 'человек';
+
+    }
+
+
+    function money(value) {
+
+      return `${Math.round(Number(value) || 0).toLocaleString('ru-RU')} ${currency.value}`;
+
+    }
+
+
+    function round(value) {
+      return Math.round(
+        value * 100
+      ) / 100;
+    }
+
+
+    /* ================= TODAY ================= */
+
+    function goToday() {
+
+      selectedDate.value =
+        todayISO();
+
+      activeTab.value =
+        'today';
+
+    }
+
+
+    /* ================= THEME ================= */
+
+    function applyTheme() {
+
+      let dark = false;
+
+
+      if (theme.value === 'dark') {
+        dark = true;
+      }
+
+
+      if (
+        theme.value === 'system'
+      ) {
+
+        dark =
+          window.matchMedia &&
+          window.matchMedia(
+            '(prefers-color-scheme: dark)'
+          ).matches;
+
+      }
+
+
+      document.documentElement
+        .classList
+        .toggle(
+          'dark',
+          dark
+        );
+
+    }
+
+
+    /* ================= NOTIFICATIONS ================= */
+
+    const notifiedIds = ref(
+      load(
+        STORAGE.notified,
+        []
+      )
+    );
+
+
+    function setReminder(value) {
+
+      reminderMinutes.value =
+        Number(value);
+
+
+      save(
+        STORAGE.reminder,
+        reminderMinutes.value
+      );
+
+
+      if (
+        reminderMinutes.value > 0
+      ) {
+
+        requestNotificationPermission();
+
+      }
+
+      showToast(
+        reminderMinutes.value === 0
+          ? 'Уведомления отключены'
+          : `Напоминание: за ${reminderMinutes.value / 60} ч.`
+      );
+
+    }
+
+
+    async function requestNotificationPermission() {
+
+      if (
+        !('Notification' in window)
+      ) {
+
+        notificationStatus.value =
+          'Этот браузер не поддерживает системные уведомления.';
+
+        return;
+
+      }
+
+
+      if (
+        Notification.permission === 'granted'
+      ) {
+
+        notificationStatus.value =
+          'Уведомления разрешены.';
+
+        return;
+
+      }
+
+
+      if (
+        Notification.permission === 'denied'
+      ) {
+
+        notificationStatus.value =
+          'Уведомления запрещены в настройках браузера.';
+
+        return;
+
+      }
+
+
+      try {
+
+        const result =
+          await Notification.requestPermission();
+
+
+        notificationStatus.value =
+          result === 'granted'
+            ? 'Уведомления разрешены.'
+            : 'Разрешение не предоставлено.';
+
+      } catch {
+
+        notificationStatus.value =
+          'Не удалось запросить разрешение.';
+
+      }
+
+    }
+
+
+    function checkNotifications() {
+
+      if (
+        reminderMinutes.value <= 0
+      ) {
+        return;
+      }
+
+
+      if (
+        !('Notification' in window) ||
+        Notification.permission !== 'granted'
+      ) {
+        return;
+      }
+
+
+      const now =
+        new Date();
+
+
+      lessons.value
+        .filter(
+          l =>
+            l.status === 'planned'
+        )
+        .forEach(lesson => {
+
+          const [h, m] =
+            lesson.start
+              .split(':')
+              .map(Number);
+
+
+          const start =
+            dateFromISO(
+              lesson.date
+            );
+
+
+          start.setHours(
+            h,
+            m,
+            0,
+            0
+          );
+
+
+          const diff =
+            (start.getTime() -
+              now.getTime()) /
+            60000;
+
+
+          /*
+           * Даём небольшое окно,
+           * чтобы уведомление не потерялось.
+           */
+
+          if (
+            diff <= reminderMinutes.value &&
+            diff > reminderMinutes.value - 2
+          ) {
+
+            if (
+              notifiedIds.value.includes(
+                lesson.id
+              )
+            ) {
+              return;
+            }
+
+
+            new Notification(
+              'Dance Planner',
+              {
+                body:
+                  `${typeName(lesson.typeId)} · ${lesson.start} · ${lessonTitle(lesson)}`,
+                icon: ''
+              }
+            );
+
+
+            notifiedIds.value.push(
+              lesson.id
+            );
+
+
+            save(
+              STORAGE.notified,
+              notifiedIds.value
+            );
+
+          }
+
+        });
+
+    }
+
+
+    let notificationTimer = null;
+
+
+    /* ================= TOAST ================= */
+
+    function showToast(message) {
+
+      toast.value =
+        message;
+
+
+      clearTimeout(
+        toastTimer
+      );
+
+
+      toastTimer =
+        setTimeout(
+          () => {
+            toast.value = '';
+          },
+          2500
+        );
+
+    }
+
+
+    /* ================= EXPORT ================= */
+
+    function exportData() {
+
+      const data = {
+
+        version: 2,
+
+        exportedAt:
+          new Date().toISOString(),
+
+        currency:
+          currency.value,
+
+        theme:
+          theme.value,
+
+        reminderMinutes:
+          reminderMinutes.value,
+
+        schools:
+          schools.value,
+
+        groups:
+          groups.value,
+
+        lessons:
+          lessons.value,
+
+        lessonTypes:
+          lessonTypes.value
+
+      };
+
+
+      const blob =
+        new Blob(
+          [
+            JSON.stringify(
+              data,
+              null,
+              2
+            )
+          ],
+          {
+            type: 'application/json'
+          }
+        );
+
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+
+      const a =
+        document.createElement(
+          'a'
+        );
+
+
+      a.href = url;
+
+      a.download =
+        `dance-planner-backup-${todayISO()}.json`;
+
+      a.click();
+
+
+      URL.revokeObjectURL(
+        url
+      );
+
+
+      showToast(
+        'Резервная копия создана'
+      );
+
+    }
+
+
+    async function importData(event) {
+
+      const file =
+        event.target.files[0];
+
+
+      if (!file) return;
+
+
+      try {
+
+        const text =
+          await file.text();
+
+
+        const data =
+          JSON.parse(text);
+
+
+        if (
+          !confirm(
+            'Восстановить данные из этого файла? Текущие данные будут заменены.'
+          )
+        ) {
+          return;
+        }
+
+
+        if (
+          Array.isArray(data.schools)
+        ) {
+
+          schools.value =
+            data.schools;
+
+          save(
+            STORAGE.schools,
+            schools.value
+          );
+
+        }
+
+
+        if (
+          Array.isArray(data.groups)
+        ) {
+
+          groups.value =
+            data.groups;
+
+          save(
+            STORAGE.groups,
+            groups.value
+          );
+
+        }
+
+
+        if (
+          Array.isArray(data.lessons)
+        ) {
+
+          lessons.value =
+            data.lessons;
+
+          save(
+            STORAGE.lessons,
+            lessons.value
+          );
+
+        }
+
+
+        if (
+          Array.isArray(data.lessonTypes)
+        ) {
+
+          lessonTypes.value =
+            data.lessonTypes.map(
+              t => ({
+                ...t,
+                paymentRule:
+                  normalizeRule(
+                    t.paymentRule
+                  )
+              })
+            );
+
+          save(
+            STORAGE.types,
+            lessonTypes.value
+          );
+
+        }
+
+
+        if (data.currency) {
+
+          currency.value =
+            data.currency;
+
+          save(
+            STORAGE.currency,
+            currency.value
+          );
+
+        }
+
+
+        if (data.theme) {
+
+          theme.value =
+            data.theme;
+
+          save(
+            STORAGE.theme,
+            theme.value
+          );
+
+        }
+
+
+        if (
+          data.reminderMinutes !== undefined
+        ) {
+
+          reminderMinutes.value =
+            Number(
+              data.reminderMinutes
+            );
+
+          save(
+            STORAGE.reminder,
+            reminderMinutes.value
+          );
+
+        }
+
+
+        applyTheme();
+
+
+        showToast(
+          'Данные восстановлены'
+        );
+
+
+      } catch {
+
+        showToast(
+          'Не удалось прочитать файл'
+        );
+
+      }
+
+
+      event.target.value = '';
+
+    }
+
+
+    function resetAll() {
+
+      if (
+        !confirm(
+          'Удалить ВСЕ занятия, школы и группы? Это действие нельзя отменить.'
+        )
+      ) {
+        return;
+      }
+
+
+      schools.value = [];
+
+      groups.value = [];
+
+      lessons.value = [];
+
+      lessonTypes.value =
+        defaultTypes();
+
+
+      save(
+        STORAGE.schools,
+        []
+      );
+
+      save(
+        STORAGE.groups,
+        []
+      );
+
+      save(
+        STORAGE.lessons,
+        []
+      );
+
+      save(
+        STORAGE.types,
+        lessonTypes.value
+      );
+
+
+      showToast(
+        'Все данные удалены'
+      );
+
+    }
+
+
+    /* ================= WATCHERS ================= */
+
+    watch(
+      currency,
+      value => {
+        save(
+          STORAGE.currency,
+          value
+        );
+      }
+    );
+
+
+    watch(
+      theme,
+      () => {
+
+        save(
+          STORAGE.theme,
+          theme.value
+        );
+
+        applyTheme();
+
+      }
+    );
+
+
+    watch(
+      activeTab,
+      tab => {
+
+        /*
+         * Главная «Сегодня» всегда
+         * показывает реальный сегодняшний день.
+         */
+
+        if (tab === 'today') {
+          selectedDate.value =
+            todayISO();
+        }
+
+      }
+    );
+
+
+    watch(
+      selectedDate,
+      value => {
+
+        if (!value) {
+          selectedDate.value =
+            todayISO();
+        }
+
+      }
+    );
+
+
+    watch(
+      lessons,
+      value => {
+
+        save(
+          STORAGE.lessons,
+          value
+        );
+
+      },
+      {
+        deep: true
+      }
+    );
+
+
+    /* ================= MOUNT ================= */
+
+    onMounted(() => {
+
+      applyTheme();
+
+
+      /*
+       * Проверяем уведомления каждые 30 секунд.
+       */
+
+      notificationTimer =
+        setInterval(
+          checkNotifications,
+          30000
+        );
+
+
+      checkNotifications();
+
+
+      /*
+       * Если системная тема меняется,
+       * интерфейс тоже меняется.
+       */
+
+      if (
+        window.matchMedia
+      ) {
+
+        const media =
+          window.matchMedia(
+            '(prefers-color-scheme: dark)'
+          );
+
+
+        const handler =
+          () => {
+
+            if (
+              theme.value === 'system'
+            ) {
+              applyTheme();
+            }
+
+          };
+
+
+        media.addEventListener?.(
+          'change',
+          handler
+        );
+
+      }
+
+    });
+
+
+    onBeforeUnmount(() => {
+
+      clearInterval(
+        notificationTimer
+      );
+
+    });
+
+
+    /* ================= RETURN ================= */
+
+    return {
+
+      /* data */
+      currency,
+      theme,
+      reminderMinutes,
+      schools,
+      groups,
+      lessons,
+      lessonTypes,
+
+      /* ui */
+      activeTab,
+      selectedDate,
+      calendarMode,
+      calendarModes,
+      weekNames,
+
+      formMode,
+      editingLessonId,
+      newLesson,
+
+      toast,
+
+      schoolModal,
+      groupModal,
+      schoolForm,
+      groupForm,
+
+      themes,
+      reminderOptions,
+
+      notificationStatus,
+
+      financePeriod,
+      financeDate,
+      financeStartCustom,
+      financeEndCustom,
+
+      /* computed */
+      headerDate,
+      selectableSchools,
+      selectableGroups,
+
+      todayLessons,
+      sortedTodayLessons,
+      todayStats,
+
+      calendarTitle,
+      weekDays,
+      monthCells,
+      selectedDayLessons,
+
+      financeStart,
+      financeEnd,
+      financeStats,
+      financeBars,
+
+      autoCalculatedPrice,
+
+      /* helpers */
+      todayISO,
+      formatLongDate,
+      formatShortDate,
+      formatWeekDay,
+      typeName,
+      typeColor,
+      schoolName,
+      lessonTitle,
+      statusName,
+      pluralPeople,
+      money,
+
+      /* actions */
+      goToday,
+
+      openAdd,
+      editLesson,
+      copyLesson,
+      cancelForm,
+      saveLesson,
+      deleteLesson,
+      setStatus,
+
+      changePeople,
+      onLessonTypeChanged,
+      onGroupChanged,
+
+      calendarPrev,
+      calendarNext,
+      copyWeek,
+
+      addSchool,
+      editSchool,
+      saveSchool,
+      toggleSchoolArchive,
+
+      addGroup,
+      editGroup,
+      saveGroup,
+      toggleGroupArchive,
+
+      updateTypeRule,
+
+      setReminder,
+      requestNotificationPermission,
+
+      exportData,
+      importData,
+      resetAll,
+
+      recalculatePrice
+
+    };
+
+  }
+
+});
+
+
+/* =========================================================
+   GLOBAL CLASSES
+========================================================= */
+
+const style = document.createElement('style');
+
+style.textContent = `
+
+  .field {
+    width: 100%;
+    box-sizing: border-box;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 11px 13px;
+    color: #111827;
+  }
+
+  .small-field {
+    width: 100%;
+    box-sizing: border-box;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 9px;
+    padding: 7px 6px;
+    color: #111827;
+    font-size: 13px;
+  }
+
+  .dark .field {
+    background: #1f2937;
+    border-color: #374151;
+    color: #f9fafb;
+  }
+
+  .dark .small-field {
+    background: #374151;
+    border-color: #4b5563;
+    color: #f9fafb;
+  }
+
+  .field:focus,
+  .small-field:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 2px rgba(99,102,241,.12);
+  }
+
+`;
+
+document.head.appendChild(style);
+
+
+app.mount('#app');
+</script>
+
+</body>
+</html>
